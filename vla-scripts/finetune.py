@@ -37,7 +37,6 @@ import draccus
 import torch
 import torch.distributed as dist
 import numpy as np
-import bitsandbytes as bnb
 import tqdm
 import contextlib
 
@@ -113,7 +112,7 @@ class FinetuneConfig:
     # Tracking Parameters
     wandb_project: str = "openvla"                                  # Name of W&B project to log to (use default!)
     wandb_entity: str = "stanford-voltron"                          # Name of entity to log under
-    tensorboard_logdir: str = "/data/logs/tensorboard"
+    tensorboard_logdir: str = "/home/jizej/Workspaces/cs498-robot/project/openvla/tensorboard"
 
     # fmt: on
 

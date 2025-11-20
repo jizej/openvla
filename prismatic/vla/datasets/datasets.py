@@ -37,14 +37,19 @@ class RLDSBatchTransform:
 
     def __call__(self, rlds_batch: Dict[str, Any]) -> Dict[str, Any]:
         """Converts a RLDS batch to the format expected by the OpenVLA collator/models."""
-        dataset_name, action = rlds_batch["dataset_name"], rlds_batch["action"][0]
+        dataset_name, action = rlds_batch["dataset_name"], rlds_batch["action"][0][1]  # TODO: for affordance [1] is 2nd waypoint 
         img = Image.fromarray(rlds_batch["observation"]["image_primary"][0])
         lang = rlds_batch["task"]["language_instruction"].decode().lower()
 
         # Construct Chat-based Prompt =>> Input is default query + language instruction, output are the action tokens
         prompt_builder = self.prompt_builder_fn("openvla")
+        # conversation = [
+        #     {"from": "human", "value": f"What action should the robot take to {lang}?"},
+        #     {"from": "gpt", "value": self.action_tokenizer(action)},
+        # ]
+        # TODO: for affordance, modify conversation to ask for the waypoint that the robot should reach to grip the object
         conversation = [
-            {"from": "human", "value": f"What action should the robot take to {lang}?"},
+            {"from": "human", "value": f"What action waypoint best estabilishes the gripper to perform the task: {lang}?"},
             {"from": "gpt", "value": self.action_tokenizer(action)},
         ]
         for turn in conversation:
