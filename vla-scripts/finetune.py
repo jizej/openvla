@@ -114,6 +114,8 @@ class FinetuneConfig:
     wandb_entity: str = "stanford-voltron"                          # Name of entity to log under
     tensorboard_logdir: str = "/home/jizej/Workspaces/cs498-robot/project/openvla/tensorboard"
 
+    # batch transform parameters
+    predict_waypoint: int = -1                                        # -1: predict action, 0: predict pregrasp, 1: predict grasp, 2: predict release
     # fmt: on
 
 @draccus.wrap()
@@ -141,6 +143,11 @@ def finetune(cfg: FinetuneConfig) -> None:
             cfg.exp_id += "+q-4bit"
         if cfg.exp_tag:
             cfg.exp_id += f"+{cfg.exp_tag}"
+        if cfg.predict_waypoint != -1:
+            # -1 is trajectory, 0 is pregrasp, 1 is grasp, 2 is release, save in text
+            idx2text = {-1:"trajectory", 0: "pregrasp", 1: "grasp", 2: "release"}
+            cfg.exp_id += f"+{idx2text[cfg.predict_waypoint]}"
+
         cfg.exp_id += f"+{datetime.datetime.now().strftime('%y%m%d_%H%M')}"
 
     print(f"Fine-tuning OpenVLA Model `{cfg.vla_path}` on `{cfg.dataset_name}`  ({cfg.exp_id})")
@@ -168,6 +175,7 @@ def finetune(cfg: FinetuneConfig) -> None:
     vla = AutoModelForVision2Seq.from_pretrained(
         cfg.vla_path,
         torch_dtype=torch.bfloat16,
+        attn_implementation="flash_attention_2",
         quantization_config=quantization_config,
         low_cpu_mem_usage=True,
         trust_remote_code=True,
@@ -231,6 +239,7 @@ def finetune(cfg: FinetuneConfig) -> None:
             processor.tokenizer,
             image_transform=processor.image_processor.apply_transform,
             prompt_builder_fn=PurePromptBuilder if "v01" not in cfg.vla_path else VicunaV15ChatPromptBuilder,
+            predict_waypoint=cfg.predict_waypoint,
         )
         vla_dataset = RLDSDataset(
             cfg.data_root_dir,
@@ -349,12 +358,12 @@ def finetune(cfg: FinetuneConfig) -> None:
 
             if progress.n > 10 and loss >= metrics.loss.mean() * 1.3:
                 print(f"Step {progress.n}, abnormal loss detected:  loss={loss}  avg={metrics.loss.mean()}")
-                dump_step(
-                    progress.n, cfg,
-                    metrics=dict(step=progress.n, loss=float(loss), prev_loss=metrics.loss.mean(), token_accuracy=metrics.token_accuracy.history[-1], action_accuracy=metrics.action_accuracy.history[-1]),
-                    inputs=batch,
-                    outputs=dict(action_preds=action_preds, action_gt=action_gt, continuous_actions_pred=continuous_actions_pred, continuous_actions_gt=continuous_actions_gt)
-                )
+                # dump_step(
+                #     progress.n, cfg,
+                #     metrics=dict(step=progress.n, loss=float(loss), prev_loss=metrics.loss.mean(), token_accuracy=metrics.token_accuracy.history[-1], action_accuracy=metrics.action_accuracy.history[-1]),
+                #     inputs=batch,
+                #     outputs=dict(action_preds=action_preds, action_gt=action_gt, continuous_actions_pred=continuous_actions_pred, continuous_actions_gt=continuous_actions_gt)
+                # )
 
             metrics.loss += loss
 
